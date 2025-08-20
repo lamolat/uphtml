@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>📚 Trình xem HTML Online</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: sans-serif;
+    }
+    #controls {
+      padding: 10px;
+      background: #f0f0f0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    select, button {
+      padding: 5px;
+      font-size: 14px;
+    }
+    #viewer {
+      width: 100%;
+      height: calc(100% - 60px);
+      border: none;
+    }
+    #dropzone {
+      border: 2px dashed #aaa;
+      padding: 20px;
+      text-align: center;
+      margin: 10px;
+      background: #fff;
+      cursor: pointer;
+    }
+    #pageInfo {
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div id="dropzone">📂 Kéo & thả file HTML hoặc folder vào đây</div>
+
+  <div id="controls">
+    <label>Môn học:</label>
+    <select id="subjectSelect"></select>
+
+    <label>Trang:</label>
+    <select id="pageSelect"></select>
+
+    <button onclick="prevPage()">⬅️</button>
+    <button onclick="nextPage()">➡️</button>
+
+    <span id="pageInfo">Trang 0 / 0</span>
+  </div>
+
+  <iframe id="viewer"></iframe>
+
+  <script>
+    let data = {};
+    let currentSubject = '';
+    let currentPage = 1;
+
+    const dropzone = document.getElementById('dropzone');
+    dropzone.addEventListener('dragover', e => e.preventDefault());
+    dropzone.addEventListener('drop', handleDrop);
+
+    function handleDrop(e) {
+      e.preventDefault();
+      const items = e.dataTransfer.items;
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i].webkitGetAsEntry();
+        if (item.isDirectory) {
+          traverseDirectory(item, item.name);
+        } else {
+          const file = e.dataTransfer.files[i];
+          loadFile(file, 'Mặc định');
+        }
+      }
+    }
+
+    function traverseDirectory(entry, folderName) {
+      const reader = entry.createReader();
+      reader.readEntries(entries => {
+        entries.forEach(ent => {
+          if (ent.isFile) {
+            ent.file(file => loadFile(file, folderName));
+          }
+        });
+      });
+    }
+
+    function loadFile(file, subject) {
+      if (!file.name.endsWith('.html')) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (!data[subject]) data[subject] = [];
+        data[subject].push(reader.result);
+        updateSubjects();
+      };
+      reader.readAsText(file);
+    }
+
+    function updateSubjects() {
+      const subjectSelect = document.getElementById('subjectSelect');
+      subjectSelect.innerHTML = '';
+      for (const subject in data) {
+        const option = document.createElement('option');
+        option.value = subject;
+        option.textContent = subject;
+        subjectSelect.appendChild(option);
+      }
+      currentSubject = subjectSelect.value;
+      loadPages();
+    }
+
+    function loadPages() {
+      const pageSelect = document.getElementById('pageSelect');
+      pageSelect.innerHTML = '';
+      const pages = data[currentSubject];
+      pages.forEach((_, i) => {
+        const option = document.createElement('option');
+        option.value = i + 1;
+        option.textContent = 'Trang ' + (i + 1);
+        pageSelect.appendChild(option);
+      });
+      currentPage = 1;
+      updateViewer();
+    }
+
+    function updateViewer() {
+      const html = data[currentSubject][currentPage - 1];
+      const blob = new Blob([html], { type: 'text/html' });
+      document.getElementById('viewer').src = URL.createObjectURL(blob);
+      document.getElementById('pageSelect').value = currentPage;
+      document.getElementById('pageInfo').textContent = "Trang " + currentPage + " / " + data[currentSubject].length;
+    }
+
+    document.getElementById('subjectSelect').onchange = () => {
+      currentSubject = subjectSelect.value;
+      loadPages();
+    };
+    document.getElementById('pageSelect').onchange = () => {
+      currentPage = parseInt(pageSelect.value);
+      updateViewer();
+    };
+    function prevPage() {
+      if (currentPage > 1) {
+        currentPage--;
+        updateViewer();
+      }
+    }
+    function nextPage() {
+      if (currentPage < data[currentSubject].length) {
+        currentPage++;
+        updateViewer();
+      }
+    }
+  </script>
+</body>
+</html>
