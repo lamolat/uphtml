@@ -77,8 +77,17 @@
         if (item.isDirectory) {
           traverseDirectory(item, item.name);
         } else {
-          const file = e.dataTransfer.files[i];
-          loadFile(file, 'Mặc định');
+          const files = e.dataTransfer.files;
+          for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          let subject = 'Mặc định';
+          if (file.webkitRelativePath) {
+          const parts = file.webkitRelativePath.split('/');
+          if (parts.length > 1) subject = parts[0];
+  }
+  loadFile(file, subject);
+}
+
         }
       }
     }
