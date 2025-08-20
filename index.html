@@ -34,15 +34,27 @@
       margin: 10px;
       background: #fff;
       cursor: pointer;
+      position: relative;
     }
     #pageInfo {
       font-weight: bold;
     }
+    #fileInput {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
-  <div id="dropzone">📂 Kéo & thả file HTML hoặc folder vào đây</div>
-  <input type="file" id="fileInput" style="display:none" multiple webkitdirectory>
+  <div id="dropzone">
+    <span>📂 Kéo & thả file HTML hoặc folder vào đây hoặc click để chọn file</span>
+    <input type="file" id="fileInput" multiple webkitdirectory>
+  </div>
   <div id="controls">
     <label>Môn học:</label>
     <select id="subjectSelect"></select>
@@ -55,7 +67,6 @@
     
     <span id="pageInfo">Trang 0 / 0</span>
     <button onclick="downloadCombinedHTML()">📥 Tải về toàn bộ</button>
-
   </div>
 
   <iframe id="viewer"></iframe>
@@ -66,28 +77,50 @@
     let currentPage = 1;
 
     const dropzone = document.getElementById('dropzone');
-    dropzone.addEventListener('dragover', e => e.preventDefault());
-    dropzone.addEventListener('drop', handleDrop);
+    const fileInput = document.getElementById('fileInput');
+
+    // Xử lý sự kiện kéo thả
+    dropzone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropzone.style.background = '#e0e0e0';
+    });
+
+    dropzone.addEventListener('dragleave', () => {
+      dropzone.style.background = '#fff';
+    });
+
+    dropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropzone.style.background = '#fff';
+      handleDrop(e);
+    });
+
+    // Xử lý khi click vào dropzone
+    dropzone.addEventListener('click', (e) => {
+      // Ngăn sự kiện click lan đến file input
+      if (e.target === dropzone || e.target.tagName === 'SPAN') {
+        fileInput.click();
+      }
+    });
 
     function handleDrop(e) {
-      e.preventDefault();
       const items = e.dataTransfer.items;
+      if (!items) return;
+      
       for (let i = 0; i < items.length; i++) {
-        const item = items[i].webkitGetAsEntry();
-        if (item.isDirectory) {
-          traverseDirectory(item, item.name);
-        } else {
-          const files = e.dataTransfer.files;
-          for (let i = 0; i < files.length; i++) {
-          const file = files[i];
-          let subject = 'Mặc định';
-          if (file.webkitRelativePath) {
-          const parts = file.webkitRelativePath.split('/');
-          if (parts.length > 1) subject = parts[0];
-  }
-  loadFile(file, subject);
-}
-
+        const entry = items[i].webkitGetAsEntry ? items[i].webkitGetAsEntry() : null;
+        if (entry) {
+          if (entry.isDirectory) {
+            traverseDirectory(entry, entry.name);
+          } else {
+            const file = items[i].getAsFile();
+            let subject = 'Mặc định';
+            if (file.webkitRelativePath) {
+              const parts = file.webkitRelativePath.split('/');
+              if (parts.length > 1) subject = parts[0];
+            }
+            loadFile(file, subject);
+          }
         }
       }
     }
@@ -96,8 +129,10 @@
       const reader = entry.createReader();
       reader.readEntries(entries => {
         entries.forEach(ent => {
-          if (ent.isFile) {
+          if (ent.isFile && ent.name.endsWith('.html')) {
             ent.file(file => loadFile(file, folderName));
+          } else if (ent.isDirectory) {
+            traverseDirectory(ent, folderName);
           }
         });
       });
@@ -123,25 +158,31 @@
         option.textContent = subject;
         subjectSelect.appendChild(option);
       }
-      currentSubject = subjectSelect.value;
-      loadPages();
+      if (subjectSelect.options.length > 0) {
+        currentSubject = subjectSelect.value;
+        loadPages();
+      }
     }
 
     function loadPages() {
       const pageSelect = document.getElementById('pageSelect');
       pageSelect.innerHTML = '';
       const pages = data[currentSubject];
-      pages.forEach((_, i) => {
-        const option = document.createElement('option');
-        option.value = i + 1;
-        option.textContent = (i + 1);
-        pageSelect.appendChild(option);
-      });
-      currentPage = 1;
-      updateViewer();
+      if (pages && pages.length > 0) {
+        pages.forEach((_, i) => {
+          const option = document.createElement('option');
+          option.value = i + 1;
+          option.textContent = (i + 1);
+          pageSelect.appendChild(option);
+        });
+        currentPage = 1;
+        updateViewer();
+      }
     }
 
     function updateViewer() {
+      if (!data[currentSubject] || data[currentSubject].length === 0) return;
+      
       const html = data[currentSubject][currentPage - 1];
       const blob = new Blob([html], { type: 'text/html' });
       document.getElementById('viewer').src = URL.createObjectURL(blob);
@@ -150,34 +191,38 @@
     }
 
     document.getElementById('subjectSelect').onchange = () => {
-      currentSubject = subjectSelect.value;
+      currentSubject = document.getElementById('subjectSelect').value;
       loadPages();
     };
+    
     document.getElementById('pageSelect').onchange = () => {
-      currentPage = parseInt(pageSelect.value);
+      currentPage = parseInt(document.getElementById('pageSelect').value);
       updateViewer();
     };
+    
     function prevPage() {
       if (currentPage > 1) {
         currentPage--;
         updateViewer();
       }
     }
+    
     function nextPage() {
       if (currentPage < data[currentSubject].length) {
         currentPage++;
         updateViewer();
       }
     }
+    
     function downloadCombinedHTML() {
-  if (!data[currentSubject] || data[currentSubject].length === 0) return;
+      if (!data[currentSubject] || data[currentSubject].length === 0) return;
 
-  const subjectData = {};
-  subjectData[currentSubject] = data[currentSubject];
+      const subjectData = {};
+      subjectData[currentSubject] = data[currentSubject];
 
-  const folder_data = JSON.stringify(subjectData).replace(/<\/script>/g, "<\\/script>");
+      const folder_data = JSON.stringify(subjectData).replace(/<\/script>/g, "<\\/script>");
 
-  const html = `
+      const html = `
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -267,34 +312,33 @@
     }
 
     loadSubjects();
-  </script>
+  <\/script>
 </body>
 </html>
 `;
 
-  const blob = new Blob([html], { type: 'text/html' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `tong_hop_${currentSubject}.html`;
-  a.click();
-}
-
-
-  const fileInput = document.getElementById('fileInput');
-  dropzone.addEventListener('click', () => fileInput.click());
-  fileInput.addEventListener('change', (e) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      let subject = 'Mặc định';
-      if (file.webkitRelativePath) {
-        const parts = file.webkitRelativePath.split('/');
-        if (parts.length > 1) subject = parts[0];
-      }
-      loadFile(file, subject);
+      const blob = new Blob([html], { type: 'text/html' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `tong_hop_${currentSubject}.html`;
+      a.click();
     }
-  });
+
+    // Xử lý sự kiện khi chọn file qua input
+    fileInput.addEventListener('change', (e) => {
+      const files = e.target.files;
+      if (!files || files.length === 0) return;
+      
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        let subject = 'Mặc định';
+        if (file.webkitRelativePath) {
+          const parts = file.webkitRelativePath.split('/');
+          if (parts.length > 1) subject = parts[0];
+        }
+        loadFile(file, subject);
+      }
+    });
   </script>
 </body>
 </html>
