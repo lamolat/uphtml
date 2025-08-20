@@ -125,7 +125,7 @@
       pages.forEach((_, i) => {
         const option = document.createElement('option');
         option.value = i + 1;
-        option.textContent = 'Trang ' + (i + 1);
+        option.textContent = (i + 1);
         pageSelect.appendChild(option);
       });
       currentPage = 1;
@@ -163,33 +163,113 @@
     function downloadCombinedHTML() {
   if (!data[currentSubject] || data[currentSubject].length === 0) return;
 
-  let combinedHTML = `
+  const subjectData = {};
+  subjectData[currentSubject] = data[currentSubject];
+
+  const folder_data = JSON.stringify(subjectData).replace(/<\/script>/g, "<\\/script>");
+
+  const html = `
 <!DOCTYPE html>
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
   <title>Tổng hợp ${currentSubject}</title>
   <style>
-    body { font-family: sans-serif; padding: 20px; }
-    section { margin-bottom: 40px; border-bottom: 1px solid #ccc; padding-bottom: 20px; }
-    h2 { color: #333; }
+    html, body { margin: 0; padding: 0; height: 100%; font-family: sans-serif; }
+    #controls { padding: 10px; background: #f0f0f0; display: flex; gap: 10px; flex-wrap: wrap; }
+    select, button { padding: 5px; font-size: 14px; }
+    #viewer { width: 100%; height: calc(100% - 60px); border: none; }
+    #pageInfo { font-weight: bold; }
   </style>
 </head>
 <body>
+  <div id="controls">
+    <label>Môn học:</label>
+    <select id="subjectSelect"></select>
+    <label>Trang:</label>
+    <select id="pageSelect"></select>
+    <button onclick="prevPage()">⬅️</button>
+    <button onclick="nextPage()">➡️</button>
+    <span id="pageInfo">Trang 0 / 0</span>
+  </div>
+  <iframe id="viewer"></iframe>
+  <script>
+    const data = ${folder_data};
+    let currentSubject = Object.keys(data)[0];
+    let currentPage = 1;
+
+    const subjectSelect = document.getElementById('subjectSelect');
+    const pageSelect = document.getElementById('pageSelect');
+    const viewer = document.getElementById('viewer');
+    const pageInfo = document.getElementById('pageInfo');
+
+    function loadSubjects() {
+      subjectSelect.innerHTML = '';
+      for (const subject in data) {
+        const option = document.createElement('option');
+        option.value = subject;
+        option.textContent = subject;
+        subjectSelect.appendChild(option);
+      }
+      currentSubject = subjectSelect.value;
+      loadPages();
+    }
+
+    function loadPages() {
+      pageSelect.innerHTML = '';
+      const pages = data[currentSubject];
+      pages.forEach((_, i) => {
+        const option = document.createElement('option');
+        option.value = i + 1;
+        option.textContent = i + 1;
+        pageSelect.appendChild(option);
+      });
+      currentPage = 1;
+      updateViewer();
+    }
+
+    function updateViewer() {
+      const html = data[currentSubject][currentPage - 1];
+      const blob = new Blob([html], { type: 'text/html' });
+      viewer.src = URL.createObjectURL(blob);
+      pageSelect.value = currentPage;
+      pageInfo.textContent = "Trang " + currentPage + " / " + data[currentSubject].length;
+    }
+
+    subjectSelect.onchange = () => {
+      currentSubject = subjectSelect.value;
+      loadPages();
+    };
+    pageSelect.onchange = () => {
+      currentPage = parseInt(pageSelect.value);
+      updateViewer();
+    };
+    function prevPage() {
+      if (currentPage > 1) {
+        currentPage--;
+        updateViewer();
+      }
+    }
+    function nextPage() {
+      if (currentPage < data[currentSubject].length) {
+        currentPage++;
+        updateViewer();
+      }
+    }
+
+    loadSubjects();
+  </script>
+</body>
+</html>
 `;
 
-  data[currentSubject].forEach((html, index) => {
-    combinedHTML += `<section><h2>Trang ${index + 1}</h2>\n${html}\n</section>\n`;
-  });
-
-  combinedHTML += `</body></html>`;
-
-  const blob = new Blob([combinedHTML], { type: 'text/html' });
+  const blob = new Blob([html], { type: 'text/html' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = `tong_hop_${currentSubject}.html`;
   a.click();
 }
+
   </script>
 </body>
 </html>
