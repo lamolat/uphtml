@@ -52,8 +52,10 @@
 
     <button onclick="prevPage()">⬅️</button>
     <button onclick="nextPage()">➡️</button>
-
+    
     <span id="pageInfo">Trang 0 / 0</span>
+    <button onclick="downloadCombinedHTML()">📥 Tải về toàn bộ</button>
+
   </div>
 
   <iframe id="viewer"></iframe>
@@ -158,6 +160,36 @@
         updateViewer();
       }
     }
+    function downloadCombinedHTML() {
+  if (!data[currentSubject] || data[currentSubject].length === 0) return;
+
+  let combinedHTML = `
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Tổng hợp ${currentSubject}</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    section { margin-bottom: 40px; border-bottom: 1px solid #ccc; padding-bottom: 20px; }
+    h2 { color: #333; }
+  </style>
+</head>
+<body>
+`;
+
+  data[currentSubject].forEach((html, index) => {
+    combinedHTML += `<section><h2>Trang ${index + 1}</h2>\n${html}\n</section>\n`;
+  });
+
+  combinedHTML += `</body></html>`;
+
+  const blob = new Blob([combinedHTML], { type: 'text/html' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `tong_hop_${currentSubject}.html`;
+  a.click();
+}
   </script>
 </body>
 </html>
