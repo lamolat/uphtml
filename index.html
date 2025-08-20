@@ -42,7 +42,7 @@
 </head>
 <body>
   <div id="dropzone">📂 Kéo & thả file HTML hoặc folder vào đây</div>
-
+  <input type="file" id="fileInput" style="display:none" multiple webkitdirectory>
   <div id="controls">
     <label>Môn học:</label>
     <select id="subjectSelect"></select>
@@ -270,6 +270,22 @@
   a.click();
 }
 
+
+  const fileInput = document.getElementById('fileInput');
+  dropzone.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', (e) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      let subject = 'Mặc định';
+      if (file.webkitRelativePath) {
+        const parts = file.webkitRelativePath.split('/');
+        if (parts.length > 1) subject = parts[0];
+      }
+      loadFile(file, subject);
+    }
+  });
   </script>
 </body>
 </html>
