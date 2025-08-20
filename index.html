@@ -48,6 +48,12 @@
       opacity: 0;
       cursor: pointer;
     }
+    .status {
+      margin: 10px;
+      padding: 10px;
+      background: #f8f8f8;
+      border-radius: 4px;
+    }
   </style>
 </head>
 <body>
@@ -55,6 +61,7 @@
     <span>📂 Kéo & thả file HTML hoặc folder vào đây hoặc click để chọn file</span>
     <input type="file" id="fileInput" multiple webkitdirectory>
   </div>
+  <div class="status" id="status">Chưa có file nào được tải lên</div>
   <div id="controls">
     <label>Môn học:</label>
     <select id="subjectSelect"></select>
@@ -78,6 +85,7 @@
 
     const dropzone = document.getElementById('dropzone');
     const fileInput = document.getElementById('fileInput');
+    const statusEl = document.getElementById('status');
 
     // Xử lý sự kiện kéo thả
     dropzone.addEventListener('dragover', (e) => {
@@ -102,6 +110,21 @@
         fileInput.click();
       }
     });
+
+    function updateStatus() {
+      const totalSubjects = Object.keys(data).length;
+      let totalPages = 0;
+      
+      for (const subject in data) {
+        totalPages += data[subject].length;
+      }
+      
+      if (totalSubjects === 0) {
+        statusEl.textContent = "Chưa có file nào được tải lên";
+      } else {
+        statusEl.textContent = `Đã tải lên ${totalSubjects} môn học với tổng cộng ${totalPages} trang`;
+      }
+    }
 
     function handleDrop(e) {
       const items = e.dataTransfer.items;
@@ -145,28 +168,39 @@
         if (!data[subject]) data[subject] = [];
         data[subject].push(reader.result);
         updateSubjects();
+        updateStatus();
       };
       reader.readAsText(file);
     }
 
     function updateSubjects() {
       const subjectSelect = document.getElementById('subjectSelect');
+      const currentValue = subjectSelect.value;
       subjectSelect.innerHTML = '';
+      
       for (const subject in data) {
         const option = document.createElement('option');
         option.value = subject;
         option.textContent = subject;
         subjectSelect.appendChild(option);
       }
-      if (subjectSelect.options.length > 0) {
+      
+      if (currentValue && data[currentValue]) {
+        subjectSelect.value = currentValue;
+        currentSubject = currentValue;
+      } else if (subjectSelect.options.length > 0) {
         currentSubject = subjectSelect.value;
-        loadPages();
       }
+      
+      loadPages();
     }
 
     function loadPages() {
       const pageSelect = document.getElementById('pageSelect');
       pageSelect.innerHTML = '';
+      
+      if (!data[currentSubject]) return;
+      
       const pages = data[currentSubject];
       if (pages && pages.length > 0) {
         pages.forEach((_, i) => {
@@ -215,28 +249,32 @@
     }
     
     function downloadCombinedHTML() {
-      if (!data[currentSubject] || data[currentSubject].length === 0) return;
+      if (Object.keys(data).length === 0) {
+        alert('Không có dữ liệu để tải về!');
+        return;
+      }
 
-      const subjectData = {};
-      subjectData[currentSubject] = data[currentSubject];
-
-      const folder_data = JSON.stringify(subjectData).replace(/<\/script>/g, "<\\/script>");
+      // Tạo một bản sao của toàn bộ dữ liệu, thay thế </script> để tránh lỗi
+      const allData = JSON.parse(JSON.stringify(data));
+      const escapedData = JSON.stringify(allData).replace(/<\/script>/g, "<\\/script>");
 
       const html = `
 <!DOCTYPE html>
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <title>Tổng hợp ${currentSubject}</title>
+  <title>Tổng hợp tất cả môn học</title>
   <style>
     html, body { margin: 0; padding: 0; height: 100%; font-family: sans-serif; }
     #controls { padding: 10px; background: #f0f0f0; display: flex; gap: 10px; flex-wrap: wrap; }
     select, button { padding: 5px; font-size: 14px; }
     #viewer { width: 100%; height: calc(100% - 60px); border: none; }
     #pageInfo { font-weight: bold; }
+    .status { margin: 10px; padding: 10px; background: #f8f8f8; border-radius: 4px; }
   </style>
 </head>
 <body>
+  <div class="status" id="status">Tổng hợp tất cả môn học</div>
   <div id="controls">
     <label>Môn học:</label>
     <select id="subjectSelect"></select>
@@ -248,14 +286,26 @@
   </div>
   <iframe id="viewer"></iframe>
   <script>
-    const data = ${folder_data};
-    let currentSubject = Object.keys(data)[0];
+    const data = ${escapedData};
+    let currentSubject = '';
     let currentPage = 1;
 
     const subjectSelect = document.getElementById('subjectSelect');
     const pageSelect = document.getElementById('pageSelect');
     const viewer = document.getElementById('viewer');
     const pageInfo = document.getElementById('pageInfo');
+    const statusEl = document.getElementById('status');
+
+    function updateStatus() {
+      const totalSubjects = Object.keys(data).length;
+      let totalPages = 0;
+      
+      for (const subject in data) {
+        totalPages += data[subject].length;
+      }
+      
+      statusEl.textContent = \`Tổng hợp \${totalSubjects} môn học với \${totalPages} trang\`;
+    }
 
     function loadSubjects() {
       subjectSelect.innerHTML = '';
@@ -265,21 +315,26 @@
         option.textContent = subject;
         subjectSelect.appendChild(option);
       }
-      currentSubject = subjectSelect.value;
-      loadPages();
+      if (subjectSelect.options.length > 0) {
+        currentSubject = subjectSelect.value;
+        loadPages();
+      }
+      updateStatus();
     }
 
     function loadPages() {
       pageSelect.innerHTML = '';
       const pages = data[currentSubject];
-      pages.forEach((_, i) => {
-        const option = document.createElement('option');
-        option.value = i + 1;
-        option.textContent = i + 1;
-        pageSelect.appendChild(option);
-      });
-      currentPage = 1;
-      updateViewer();
+      if (pages && pages.length > 0) {
+        pages.forEach((_, i) => {
+          const option = document.createElement('option');
+          option.value = i + 1;
+          option.textContent = i + 1;
+          pageSelect.appendChild(option);
+        });
+        currentPage = 1;
+        updateViewer();
+      }
     }
 
     function updateViewer() {
@@ -294,16 +349,19 @@
       currentSubject = subjectSelect.value;
       loadPages();
     };
+    
     pageSelect.onchange = () => {
       currentPage = parseInt(pageSelect.value);
       updateViewer();
     };
+    
     function prevPage() {
       if (currentPage > 1) {
         currentPage--;
         updateViewer();
       }
     }
+    
     function nextPage() {
       if (currentPage < data[currentSubject].length) {
         currentPage++;
@@ -320,7 +378,7 @@
       const blob = new Blob([html], { type: 'text/html' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = `tong_hop_${currentSubject}.html`;
+      a.download = `tong_hop_tat_ca_mon_hoc.html`;
       a.click();
     }
 
@@ -338,7 +396,12 @@
         }
         loadFile(file, subject);
       }
+      
+      // Reset input để cho phép chọn lại cùng file nếu cần
+      fileInput.value = '';
     });
+
+    updateStatus();
   </script>
 </body>
 </html>
