@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <title>📚 Trình xem HTML Online</title>
+  <title>📚 Update multi HTML Online</title>
   <style>
     html, body {
       margin: 0;
@@ -18,7 +18,7 @@
       gap: 10px;
       flex-wrap: wrap;
     }
-    select, button {
+    select, button, input {
       padding: 5px;
       font-size: 14px;
     }
@@ -48,6 +48,47 @@
       opacity: 0;
       cursor: pointer;
     }
+    #searchContainer {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+    #searchResults {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      width: 100%;
+      background: white;
+      border: 1px solid #ccc;
+      max-height: 200px;
+      overflow-y: auto;
+      z-index: 1000;
+      display: none;
+    }
+    .search-result-item {
+      padding: 8px;
+      cursor: pointer;
+      border-bottom: 1px solid #eee;
+    }
+    .search-result-item:hover {
+      background-color: #f0f0f0;
+    }
+    .search-folder-name {
+      font-weight: bold;
+      color: #333;
+    }
+    .search-content-preview {
+      font-size: 12px;
+      color: #666;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .search-controls {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
   </style>
 </head>
 <body>
@@ -66,6 +107,17 @@
     <button onclick="nextPage()">➡️</button>
     
     <span id="pageInfo">Trang 0 / 0</span>
+    
+    <div id="searchContainer" class="search-controls">
+      <input type="text" id="searchInput" placeholder="Tìm kiếm...">
+      <div id="searchResults"></div>
+    </div>
+    
+    <label class="search-controls">
+      <input type="checkbox" id="searchCurrentOnly"> 
+      Chỉ tìm trong folder hiện tại
+    </label>
+    
     <button onclick="downloadCombinedHTML()">📥 Tải về toàn bộ</button>
   </div>
 
@@ -78,6 +130,9 @@
 
     const dropzone = document.getElementById('dropzone');
     const fileInput = document.getElementById('fileInput');
+    const searchInput = document.getElementById('searchInput');
+    const searchResults = document.getElementById('searchResults');
+    const searchCurrentOnlyCheckbox = document.getElementById('searchCurrentOnly');
 
     // Xử lý sự kiện kéo thả
     dropzone.addEventListener('dragover', (e) => {
@@ -100,6 +155,17 @@
       // Ngăn sự kiện click lan đến file input
       if (e.target === dropzone || e.target.tagName === 'SPAN') {
         fileInput.click();
+      }
+    });
+
+    // Xử lý tìm kiếm
+    searchInput.addEventListener('input', handleSearch);
+    searchInput.addEventListener('focus', handleSearch);
+    
+    // Đóng kết quả tìm kiếm khi click ra ngoài
+    document.addEventListener('click', (e) => {
+      if (!searchContainer.contains(e.target)) {
+        searchResults.style.display = 'none';
       }
     });
 
@@ -214,11 +280,84 @@
       }
     }
     
+    function handleSearch() {
+      const keyword = searchInput.value.trim().toLowerCase();
+      
+      if (keyword === '') {
+        searchResults.style.display = 'none';
+        return;
+      }
+      
+      const searchCurrentOnly = searchCurrentOnlyCheckbox.checked;
+      const results = [];
+      
+      // Duyệt qua tất cả các folder và trang để tìm kiếm
+      for (const folder in data) {
+        // Nếu chỉ tìm trong folder hiện tại, bỏ qua các folder khác
+        if (searchCurrentOnly && folder !== currentSubject) continue;
+        
+        const pages = data[folder];
+        for (let i = 0; i < pages.length; i++) {
+          const pageContent = pages[i].toLowerCase();
+          if (pageContent.includes(keyword)) {
+            // Tìm thấy kết quả, lấy một đoạn text xung quanh từ khóa
+            const index = pageContent.indexOf(keyword);
+            const start = Math.max(0, index - 30);
+            const end = Math.min(pageContent.length, index + keyword.length + 70);
+            const preview = pageContent.substring(start, end).replace(/<[^>]*>/g, '');
+            
+            results.push({
+              folder,
+              pageIndex: i,
+              preview: preview
+            });
+          }
+        }
+      }
+      
+      displaySearchResults(results);
+    }
+    
+    function displaySearchResults(results) {
+      searchResults.innerHTML = '';
+      
+      if (results.length === 0) {
+        searchResults.innerHTML = '<div class="search-result-item">Không tìm thấy kết quả</div>';
+        searchResults.style.display = 'block';
+        return;
+      }
+      
+      results.forEach(result => {
+        const item = document.createElement('div');
+        item.className = 'search-result-item';
+        item.innerHTML = `
+          <div class="search-folder-name">${result.folder}</div>
+          <div class="search-content-preview">${result.preview}</div>
+        `;
+        
+        item.addEventListener('click', () => {
+          // Chuyển đến folder và trang tương ứng
+          currentSubject = result.folder;
+          document.getElementById('subjectSelect').value = currentSubject;
+          loadPages();
+          currentPage = result.pageIndex + 1;
+          updateViewer();
+          
+          // Đóng kết quả tìm kiếm
+          searchResults.style.display = 'none';
+          searchInput.value = '';
+        });
+        
+        searchResults.appendChild(item);
+      });
+      
+      searchResults.style.display = 'block';
+    }
+    
     function downloadCombinedHTML() {
       if (!data[currentSubject] || data[currentSubject].length === 0) return;
 
       const subjectData = data; // Lấy toàn bộ dữ liệu đã upload
-
 
       const folder_data = JSON.stringify(subjectData).replace(/<\/script>/g, "<\\/script>");
 
